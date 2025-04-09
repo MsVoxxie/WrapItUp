@@ -29,9 +29,17 @@ require('./core/loaders/eventLoader')(client);
 setInterval(() => {
 	client.watchedChannels.forEach((count, channelId) => {
 		const channel = client.watchedChannels.get(channelId);
-		// If the count is greater than 0, decrease it by 1
 		if (channel.count > 0) {
+			// If the count is greater than 0, decrease it by 1
 			channel.count -= 1;
+
+			// If there is a user in the chatting array and their lastMsg is old, remove them.
+			const checkTime = 5 * 60 * 1000; // 5 minutes
+			channel.chattingUsers.forEach((user, index) => {
+				if (Date.now() - user.lastMsg > checkTime) {
+					channel.chattingUsers.splice(index, 1);
+				}
+			});
 		}
 
 		// If the count is 0, remove the channel from the watched channels
@@ -39,6 +47,6 @@ setInterval(() => {
 			client.watchedChannels.delete(channelId);
 		}
 	});
-}, 5 * 60 * 1000); // 5 minutes
+}, 10 * 60 * 1000); // 10 minutes
 
 client.login(process.env.DISCORD_TOKEN);

@@ -37,16 +37,14 @@ module.exports = {
 		channelCount.count += 1;
 
 		// Check if the user is already in the chatting users array
-		if (!channelCount.chattingUsers.includes(message.author.id)) {
-			channelCount.chattingUsers.push(message.author.id);
+		if (!channelCount.chattingUsers.some((user) => user.userId === message.author.id)) {
+			channelCount.chattingUsers.push({ userId: message.author.id, lastMsg: Date.now() });
 		}
-
-		console.log(`Channel: ${message.channel.name} | Users: ${channelCount.chattingUsers.join(', ')} | Count: ${channelCount.count}`);
 
 		// Check if the channel has reached the limit
 		if (channelCount.count >= watchedChannel.textLimit) {
 			// Format active users
-			const activeUsers = channelCount.chattingUsers.map((userId) => `<@${userId}>`).join(', ');
+			const activeUsers = channelCount.chattingUsers.map((user) => `<@${user.userId}>`).join(', ');
 
 			// Send the warning message
 			const warningMessage = watchedChannel.customWarning.replace(/{USERS}/g, activeUsers).replace(/{LIMIT}/g, watchedChannel.textLimit);
