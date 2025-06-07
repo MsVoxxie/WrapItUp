@@ -47,6 +47,7 @@ module.exports = {
 					// Remove the button after 1 minute
 					setTimeout(async () => {
 						try {
+							if (sentMsg.content.includes('## Thread created and recent messages moved!')) return;
 							await sentMsg.edit({ content: 'Thread timer expired.', components: [] });
 						} catch (err) {
 							null;
@@ -98,6 +99,7 @@ module.exports = {
 					// Remove the button after 1 minute
 					setTimeout(async () => {
 						try {
+							if (sentMsg.content.includes('## Thread created and recent messages moved!')) return;
 							await sentMsg.edit({ content: 'Thread timer expired.', components: [] });
 						} catch (err) {
 							null;
@@ -137,7 +139,7 @@ module.exports = {
 		const userMessages = allMessages.filter((msg) => !msg.author.bot);
 
 		// Use the oldest message as the starter message
-		const starterMessage = userMessages[userMessages.length - limit - 1];
+		const starterMessage = userMessages[userMessages.length - limit - 1] || userMessages[0];
 		const messagesToMove = userMessages.slice(-limit);
 
 		// Create thread from the warning message
@@ -187,11 +189,14 @@ module.exports = {
 			await thread.send({ files: attachmentChunks[i] });
 		}
 
-		// Remove the button from the original message
-		await interaction.message.edit({ components: [] });
+		// If shouldThreadDelete is enabled, delete the moved messages
+		if (watchedChannel.shouldThreadDelete) {
+			const messageIds = messagesToMove.filter((msg) => msg.id !== starterMessage.id).map((msg) => msg.id);
+			await channel.bulkDelete(messageIds, true).catch((e) => console.log(e));
+		}
 
-		await interaction.reply({
-			content: `### Thread created and recent messages moved!\n## [Go to thread](${thread.url})`,
-		});
+		// Remove the button from the original message
+		await interaction.message.edit({ content: `## Thread created and recent messages moved!\n### [Go to thread](${thread.url})`, components: [] });
+		await interaction.deferUpdate();
 	},
 };

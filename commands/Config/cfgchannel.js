@@ -48,7 +48,14 @@ module.exports = {
 			.setLabel('Enable thread creation? (yes/no)')
 			.setStyle(TextInputStyle.Short)
 			.setPlaceholder('no')
-			.setRequired(true);
+			.setRequired(false);
+
+		const threadDeleteInput = new TextInputBuilder()
+			.setCustomId('shouldThreadDelete')
+			.setLabel('Delete moved thread messages? (yes/no)')
+			.setStyle(TextInputStyle.Short)
+			.setPlaceholder('no')
+			.setRequired(false);
 
 		const warningInput = new TextInputBuilder()
 			.setCustomId('customWarning')
@@ -61,6 +68,7 @@ module.exports = {
 			new ActionRowBuilder().addComponents(watchTypeInput),
 			new ActionRowBuilder().addComponents(limitInput),
 			new ActionRowBuilder().addComponents(threadInput),
+			// new ActionRowBuilder().addComponents(threadDeleteInput), // Temporarily removing this option from the modal
 			new ActionRowBuilder().addComponents(warningInput)
 		);
 
@@ -72,7 +80,8 @@ module.exports = {
 
 		const watchType = interaction.fields.getTextInputValue('watchType').toLowerCase();
 		const textLimit = parseInt(interaction.fields.getTextInputValue('textLimit'), 10);
-		const enableThreadRaw = interaction.fields.getTextInputValue('enableThread').toLowerCase();
+		const enableThreadRaw = interaction.fields.getTextInputValue('enableThread').toLowerCase() || 'no';
+		const shouldThreadDeleteRaw = interaction.fields.getTextInputValue('shouldThreadDelete').toLowerCase() || 'no';
 		const customWarningInput = interaction.fields.getTextInputValue('customWarning');
 
 		// Validate watchType
@@ -98,7 +107,25 @@ module.exports = {
 				flags: MessageFlags.Ephemeral,
 			});
 		}
+
+		// Validate shouldThreadDelete
+		// Only validate shouldThreadDeleteRaw if thread creation is enabled
+		if (enableThreadRaw === 'yes' && !['yes', 'no'].includes(shouldThreadDeleteRaw)) {
+			return interaction.reply({
+				content: 'Should thread delete must be "yes" or "no".',
+				flags: MessageFlags.Ephemeral,
+			});
+		}
+		// If thread creation is disabled but shouldThreadDeleteRaw is provided, warn the user
+		if (enableThreadRaw !== 'yes' && shouldThreadDeleteRaw && shouldThreadDeleteRaw !== 'no') {
+			return interaction.reply({
+				content: 'Thread creation must be enabled to enable message deletion.',
+				flags: MessageFlags.Ephemeral,
+			});
+		}
+
 		const enableThread = enableThreadRaw === 'yes';
+		const shouldThreadDelete = shouldThreadDeleteRaw === 'yes';
 
 		// If thread creation is enabled, append a standard line to the custom warning
 		let threadWarning = '';
@@ -114,17 +141,26 @@ module.exports = {
 
 		await WatchedChannels.findOneAndUpdate(
 			{ guildId: interaction.guild.id, channelId: interaction.channel.id },
-			{ $set: { watchType, textLimit, customWarning, enableThread } },
+			{ $set: { watchType, textLimit, customWarning, enableThread, shouldThreadDelete } },
 			{ upsert: true }
 		);
 
-		// If thread creation is enabled, check if the bot has the necessary permissions
-		let permissionError = '';
+		// If thread creation is enabled, check for the create public threads permission
+		let permissionErrors = [];
 		if (enableThread) {
 			const botPermissions = interaction.channel.permissionsFor(interaction.guild.members.me);
 			const permissionName = new PermissionsBitField(PermissionFlagsBits.CreatePublicThreads).toArray()[0];
 			if (!botPermissions.has(PermissionFlagsBits.CreatePublicThreads)) {
-				permissionError = `\n\nHowever, I need the ${permissionName} permission to create threads!`;
+				permissionErrors.push(permissionName);
+			}
+		}
+
+		// If delete moved messages is enabled, check for the manage messages permission
+		if (shouldThreadDelete) {
+			const botPermissions = interaction.channel.permissionsFor(interaction.guild.members.me);
+			const permissionName = new PermissionsBitField(PermissionFlagsBits.ManageMessages).toArray()[0];
+			if (!botPermissions.has(PermissionFlagsBits.ManageMessages)) {
+				permissionErrors.push(permissionName);
 			}
 		}
 
@@ -132,11 +168,16 @@ module.exports = {
 		const embed = new EmbedBuilder()
 			.setTitle('Channel Configuration Updated')
 			.setColor(client.color)
-			.setDescription(`The channel has been successfully configured with the following settings${permissionError}:`)
+			.setDescription(
+				`The channel has been successfully configured with the following settings:${
+					permissionErrors.length > 0 ? `\n\nHowever, I am missing the following permissions: ${permissionErrors.join(', ')}` : ''
+				}`
+			)
 			.addFields(
 				{ name: 'Watch Type', value: watchType, inline: true },
 				{ name: 'Message Limit', value: textLimit.toString(), inline: true },
 				{ name: 'Thread Creation', value: enableThread ? 'Enabled' : 'Disabled', inline: true },
+				{ name: 'Delete Moved Messages', value: shouldThreadDelete ? 'Yes' : 'No', inline: true },
 				{ name: 'Warning Message', value: customWarning.length > 1024 ? customWarning.slice(0, 1021) + '...' : customWarning }
 			)
 			.setTimestamp();

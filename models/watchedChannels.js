@@ -25,6 +25,10 @@ const watchedChannelSchema = new Schema({
 		type: Boolean,
 		default: false,
 	},
+	shouldThreadDelete: {
+		type: Boolean,
+		default: false,
+	},
 	createdAt: {
 		type: Date,
 		default: Date.now,
