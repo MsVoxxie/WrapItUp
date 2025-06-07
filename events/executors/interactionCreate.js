@@ -24,13 +24,41 @@ module.exports = {
 				}
 
 				// Execute Command
-				if (interaction.guild) {
-					await command.execute(client, interaction);
-				} else {
-					await command.execute(client, interaction);
-				}
+				await command.execute(client, interaction);
 			} catch (error) {
 				Logger.error(error);
+			}
+		} else if (interaction.isStringSelectMenu()) {
+			const [commandName] = interaction.customId.split('-');
+			const command = interaction.client.commands.get(commandName);
+			if (command && typeof command.handleSelectMenu === 'function') {
+				try {
+					await command.handleSelectMenu(client, interaction);
+				} catch (error) {
+					Logger.error(error);
+				}
+			}
+		} else if (interaction.isModalSubmit()) {
+			// Find the command that matches the modal's customId prefix
+			const [commandName] = interaction.customId.split('-'); // e.g., 'wrapitup-config-modal'
+			const command = interaction.client.commands.get(commandName) || interaction.client.commands.find((cmd) => interaction.customId.startsWith(cmd.data.name));
+			if (command && typeof command.handleModalSubmit === 'function') {
+				try {
+					await command.handleModalSubmit(client, interaction);
+				} catch (error) {
+					Logger.error(error);
+				}
+			}
+		} else if (interaction.isButton()) {
+			const [handlerName] = interaction.customId.split('-');
+			let handler = interaction.client.commands.get(handlerName) || interaction.client.events.get(handlerName);
+
+			if (handler && typeof handler.handleButton === 'function') {
+				try {
+					await handler.handleButton(client, interaction);
+				} catch (error) {
+					Logger.error(error);
+				}
 			}
 		}
 	},

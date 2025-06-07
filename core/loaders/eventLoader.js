@@ -16,6 +16,7 @@ module.exports = (client) => {
 		for (const eventFile of eventFiles) {
 			const loadedEvent = require(eventFile);
 			if (loadedEvent.name) client.events.set(loadedEvent.name, loadedEvent);
+			if (loadedEvent.handlerName) client.events.set(loadedEvent.handlerName, loadedEvent);
 
 			// Switch statement to determine how to load the event
 			switch (loadedEvent.runType) {

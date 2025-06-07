@@ -4,7 +4,7 @@ const { containsMedia } = require('../../functions/helpers/msgFunc');
 
 module.exports = {
 	name: Events.MessageCreate,
-	runType: 'infinity',
+	runType: 'disabled',
 	async execute(client, message) {
 		// Check if the message is from a bot
 		if (message.author.bot) return;

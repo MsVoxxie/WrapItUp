@@ -11,7 +11,7 @@ module.exports = {
 		.setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
 	options: {
 		devOnly: false,
-		disabled: false,
+		disabled: true,
 	},
 	async execute(client, interaction) {
 		// Grab the options

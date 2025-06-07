@@ -1,0 +1,146 @@
+const {
+	SlashCommandBuilder,
+	ActionRowBuilder,
+	ModalBuilder,
+	TextInputBuilder,
+	TextInputStyle,
+	PermissionFlagsBits,
+	InteractionContextType,
+	ApplicationIntegrationType,
+	MessageFlags,
+	PermissionsBitField,
+	codeBlock,
+	EmbedBuilder,
+} = require('discord.js');
+const WatchedChannels = require('../../models/watchedChannels');
+
+module.exports = {
+	data: new SlashCommandBuilder()
+		.setName('cfgchannel')
+		.setDescription('Configure WrapItUp settings for this channel')
+		.setContexts([InteractionContextType.Guild])
+		.setIntegrationTypes([ApplicationIntegrationType.GuildInstall])
+		.setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+	options: {
+		devOnly: false,
+		disabled: false,
+	},
+	async execute(client, interaction) {
+		const modal = new ModalBuilder().setCustomId('cfgchannel-config-modal').setTitle('Configure Channel');
+
+		const watchTypeInput = new TextInputBuilder()
+			.setCustomId('watchType')
+			.setLabel('Watch Type (media/text)')
+			.setStyle(TextInputStyle.Short)
+			.setPlaceholder('media')
+			.setRequired(true);
+
+		const limitInput = new TextInputBuilder()
+			.setCustomId('textLimit')
+			.setLabel('Message Limit')
+			.setStyle(TextInputStyle.Short)
+			.setPlaceholder('5')
+			.setRequired(true)
+			.setMinLength(1);
+
+		const threadInput = new TextInputBuilder()
+			.setCustomId('enableThread')
+			.setLabel('Enable thread creation? (yes/no)')
+			.setStyle(TextInputStyle.Short)
+			.setPlaceholder('no')
+			.setRequired(true);
+
+		const warningInput = new TextInputBuilder()
+			.setCustomId('customWarning')
+			.setLabel('Custom Warning ({USERS}, {LIMIT})')
+			.setStyle(TextInputStyle.Paragraph)
+			.setPlaceholder('Leave blank for default warnings based on watch type')
+			.setRequired(false);
+
+		modal.addComponents(
+			new ActionRowBuilder().addComponents(watchTypeInput),
+			new ActionRowBuilder().addComponents(limitInput),
+			new ActionRowBuilder().addComponents(threadInput),
+			new ActionRowBuilder().addComponents(warningInput)
+		);
+
+		await interaction.showModal(modal);
+	},
+
+	async handleModalSubmit(client, interaction) {
+		if (interaction.customId !== 'cfgchannel-config-modal') return;
+
+		const watchType = interaction.fields.getTextInputValue('watchType').toLowerCase();
+		const textLimit = parseInt(interaction.fields.getTextInputValue('textLimit'), 10);
+		const enableThreadRaw = interaction.fields.getTextInputValue('enableThread').toLowerCase();
+		const customWarningInput = interaction.fields.getTextInputValue('customWarning');
+
+		// Validate watchType
+		if (!['media', 'text'].includes(watchType)) {
+			return interaction.reply({
+				content: 'Watch Type must be "media" or "text".',
+				flags: MessageFlags.Ephemeral,
+			});
+		}
+
+		// Validate textLimit
+		if (isNaN(textLimit) || textLimit < 1 || textLimit > 100) {
+			return interaction.reply({
+				content: 'Message limit must be a number between 1 and 100.',
+				flags: MessageFlags.Ephemeral,
+			});
+		}
+
+		// Validate enableThread
+		if (!['yes', 'no'].includes(enableThreadRaw)) {
+			return interaction.reply({
+				content: 'Enable thread creation must be "yes" or "no".',
+				flags: MessageFlags.Ephemeral,
+			});
+		}
+		const enableThread = enableThreadRaw === 'yes';
+
+		// If thread creation is enabled, append a standard line to the custom warning
+		let threadWarning = '';
+		if (enableThread) {
+			threadWarning = '\n\nWould you like to create a thread to continue the conversation?';
+		}
+
+		const warningTemplates = {
+			media: `Hey {USERS}, this channel is intended for media! Please keep it to images, gifs, or videos.${threadWarning}`,
+			text: `Hey {USERS}, this channel is intended for text! Please keep it to text messages.${threadWarning}`,
+		};
+		const customWarning = customWarningInput || warningTemplates[watchType];
+
+		await WatchedChannels.findOneAndUpdate(
+			{ guildId: interaction.guild.id, channelId: interaction.channel.id },
+			{ $set: { watchType, textLimit, customWarning, enableThread } },
+			{ upsert: true }
+		);
+
+		// If thread creation is enabled, check if the bot has the necessary permissions
+		let permissionError = '';
+		if (enableThread) {
+			const botPermissions = interaction.channel.permissionsFor(interaction.guild.members.me);
+			const permissionName = new PermissionsBitField(PermissionFlagsBits.CreatePublicThreads).toArray()[0];
+			if (!botPermissions.has(PermissionFlagsBits.CreatePublicThreads)) {
+				permissionError = `\n\nHowever, I need the ${permissionName} permission to create threads!`;
+			}
+		}
+
+		// Finalize message with all of the config details
+		const embed = new EmbedBuilder()
+			.setTitle('Channel Configuration Updated')
+			.setColor(client.color)
+			.setDescription(`The channel has been successfully configured with the following settings${permissionError}:`)
+			.addFields(
+				{ name: 'Watch Type', value: watchType, inline: true },
+				{ name: 'Message Limit', value: textLimit.toString(), inline: true },
+				{ name: 'Thread Creation', value: enableThread ? 'Enabled' : 'Disabled', inline: true },
+				{ name: 'Warning Message', value: customWarning.length > 1024 ? customWarning.slice(0, 1021) + '...' : customWarning }
+			)
+			.setTimestamp();
+
+		await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+	},
+};
