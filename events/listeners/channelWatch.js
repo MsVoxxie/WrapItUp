@@ -147,17 +147,51 @@ module.exports = {
 			autoArchiveDuration: 60,
 		});
 
-		// Send messages to thread
+		// Combine messages into chunks of up to 2000 characters, without splitting user messages
+		const MAX_LENGTH = 1000;
+		let chunks = [];
+		let currentChunk = '';
+		let allAttachments = [];
+
 		for (const msg of messagesToMove) {
+			const authorName = msg.member?.displayName || msg.author.username;
+			const line = `**${authorName}:** ${msg.content || '[No text content]'}\n`;
+
+			// If adding this line would exceed the limit, start a new chunk
+			if (currentChunk.length + line.length > MAX_LENGTH) {
+				chunks.push(currentChunk);
+				currentChunk = '';
+			}
+			currentChunk += line;
+
+			// Collect attachments
+			allAttachments.push(...msg.attachments.values());
+		}
+		if (currentChunk) chunks.push(currentChunk);
+
+		// Discord allows max 10 attachments per message
+		const attachmentChunks = [];
+		for (let i = 0; i < allAttachments.length; i += 10) {
+			attachmentChunks.push(allAttachments.slice(i, i + 10));
+		}
+
+		// Send the text chunks (first chunk with up to 10 attachments, rest as needed)
+		for (let i = 0; i < chunks.length; i++) {
 			await thread.send({
-				content: `**${msg.member.displayName}:** ${msg.content || '[No text content]'}`,
-				files: [...msg.attachments.values()],
+				content: chunks[i],
+				files: i === 0 ? attachmentChunks[0] || [] : [],
 			});
+		}
+		// If there are more attachments, send them in additional messages
+		for (let i = 1; i < attachmentChunks.length; i++) {
+			await thread.send({ files: attachmentChunks[i] });
 		}
 
 		// Remove the button from the original message
 		await interaction.message.edit({ components: [] });
 
-		await interaction.reply({ content: `Thread created and recent messages moved!`, flags: MessageFlags.Ephemeral });
+		await interaction.reply({
+			content: `### Thread created and recent messages moved!\n## [Go to thread](${thread.url})`,
+		});
 	},
 };
