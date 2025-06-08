@@ -33,14 +33,14 @@ module.exports = {
 			.setLabel('Watch Type (media/text)')
 			.setStyle(TextInputStyle.Short)
 			.setPlaceholder('media')
-			.setRequired(true);
+			.setRequired(false);
 
 		const limitInput = new TextInputBuilder()
 			.setCustomId('textLimit')
 			.setLabel('Message Limit')
 			.setStyle(TextInputStyle.Short)
-			.setPlaceholder('5')
-			.setRequired(true)
+			.setPlaceholder('10')
+			.setRequired(false)
 			.setMinLength(1);
 
 		const threadInput = new TextInputBuilder()
@@ -78,8 +78,8 @@ module.exports = {
 	async handleModalSubmit(client, interaction) {
 		if (interaction.customId !== 'cfgchannel-config-modal') return;
 
-		const watchType = interaction.fields.getTextInputValue('watchType').toLowerCase();
-		const textLimit = parseInt(interaction.fields.getTextInputValue('textLimit'), 10);
+		const watchType = interaction.fields.getTextInputValue('watchType').toLowerCase() || 'media';
+		const textLimit = parseInt(interaction.fields.getTextInputValue('textLimit'), 10) || 10;
 		const enableThreadRaw = interaction.fields.getTextInputValue('enableThread').toLowerCase() || 'no';
 		// const shouldThreadDeleteRaw = interaction.fields.getTextInputValue('shouldThreadDelete').toLowerCase() || 'no'; // Temporarily removing this option from the modal
 		const customWarningInput = interaction.fields.getTextInputValue('customWarning');
