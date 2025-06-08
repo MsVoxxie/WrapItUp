@@ -132,15 +132,36 @@ module.exports = {
 		const limit = watchedChannel.textLimit;
 
 		// Fetch more messages to ensure we get them all
-		const fetched = await channel.messages.fetch({ limit: limit + 3, force: true });
+		const fetched = await channel.messages.fetch({ limit: limit + 5, force: true });
 		const allMessages = Array.from(fetched.values()).sort((a, b) => a.createdTimestamp - b.createdTimestamp);
 
 		// Filter out bot messages
 		const userMessages = allMessages.filter((msg) => !msg.author.bot);
 
 		// Use the oldest message as the starter message
-		const starterMessage = userMessages[userMessages.length - limit - 1] || userMessages[0];
 		const messagesToMove = userMessages.slice(-limit);
+
+		// Determine which type to look for
+		const moveType = watchedChannel.watchType === 'media' ? 'media' : 'text';
+
+		// Find the latest message of the relevant type in userMessages (not just messagesToMove)
+		let starterMessage = null;
+		for (let i = userMessages.length - 1; i >= 0; i--) {
+			const msg = userMessages[i];
+			const isMedia = containsMedia(msg);
+			if ((moveType === 'media' && isMedia) || (moveType === 'text' && !isMedia)) {
+				starterMessage = msg;
+				break;
+			}
+		}
+
+		// Fallback to the oldest message in messagesToMove, or userMessages, or allMessages
+		if (!starterMessage) starterMessage = messagesToMove[0] || userMessages[0] || allMessages[0];
+
+		// If the starter message is in the messagesToMove, remove it
+		if (messagesToMove.includes(starterMessage)) {
+			messagesToMove.splice(messagesToMove.indexOf(starterMessage), 1);
+		}
 
 		// Create thread from the warning message
 		const threadName = `Continued Conversation`;

@@ -50,12 +50,12 @@ module.exports = {
 			.setPlaceholder('no')
 			.setRequired(false);
 
-		const threadDeleteInput = new TextInputBuilder()
-			.setCustomId('shouldThreadDelete')
-			.setLabel('Delete moved thread messages? (yes/no)')
-			.setStyle(TextInputStyle.Short)
-			.setPlaceholder('no')
-			.setRequired(false);
+		// const threadDeleteInput = new TextInputBuilder() // Temporarily removing this option from the modal
+		// 	.setCustomId('shouldThreadDelete')
+		// 	.setLabel('Delete moved thread messages? (yes/no)')
+		// 	.setStyle(TextInputStyle.Short)
+		// 	.setPlaceholder('no')
+		// 	.setRequired(false);
 
 		const warningInput = new TextInputBuilder()
 			.setCustomId('customWarning')
@@ -81,7 +81,7 @@ module.exports = {
 		const watchType = interaction.fields.getTextInputValue('watchType').toLowerCase();
 		const textLimit = parseInt(interaction.fields.getTextInputValue('textLimit'), 10);
 		const enableThreadRaw = interaction.fields.getTextInputValue('enableThread').toLowerCase() || 'no';
-		const shouldThreadDeleteRaw = interaction.fields.getTextInputValue('shouldThreadDelete').toLowerCase() || 'no';
+		// const shouldThreadDeleteRaw = interaction.fields.getTextInputValue('shouldThreadDelete').toLowerCase() || 'no'; // Temporarily removing this option from the modal
 		const customWarningInput = interaction.fields.getTextInputValue('customWarning');
 
 		// Validate watchType
@@ -110,22 +110,23 @@ module.exports = {
 
 		// Validate shouldThreadDelete
 		// Only validate shouldThreadDeleteRaw if thread creation is enabled
-		if (enableThreadRaw === 'yes' && !['yes', 'no'].includes(shouldThreadDeleteRaw)) {
-			return interaction.reply({
-				content: 'Should thread delete must be "yes" or "no".',
-				flags: MessageFlags.Ephemeral,
-			});
-		}
+		// if (enableThreadRaw === 'yes' && !['yes', 'no'].includes(shouldThreadDeleteRaw)) { // Temporarily removing this option from the modal
+		// 	return interaction.reply({
+		// 		content: 'Should thread delete must be "yes" or "no".',
+		// 		flags: MessageFlags.Ephemeral,
+		// 	});
+		// }
+
 		// If thread creation is disabled but shouldThreadDeleteRaw is provided, warn the user
-		if (enableThreadRaw !== 'yes' && shouldThreadDeleteRaw && shouldThreadDeleteRaw !== 'no') {
-			return interaction.reply({
-				content: 'Thread creation must be enabled to enable message deletion.',
-				flags: MessageFlags.Ephemeral,
-			});
-		}
+		// if (enableThreadRaw !== 'yes' && shouldThreadDeleteRaw && shouldThreadDeleteRaw !== 'no') { // Temporarily removing this option from the modal
+		// 	return interaction.reply({
+		// 		content: 'Thread creation must be enabled to enable message deletion.',
+		// 		flags: MessageFlags.Ephemeral,
+		// 	});
+		// }
 
 		const enableThread = enableThreadRaw === 'yes';
-		const shouldThreadDelete = shouldThreadDeleteRaw === 'yes';
+		// const shouldThreadDelete = shouldThreadDeleteRaw === 'yes'; // Temporarily removing this option from the modal
 
 		// If thread creation is enabled, append a standard line to the custom warning
 		let threadWarning = '';
@@ -141,7 +142,7 @@ module.exports = {
 
 		await WatchedChannels.findOneAndUpdate(
 			{ guildId: interaction.guild.id, channelId: interaction.channel.id },
-			{ $set: { watchType, textLimit, customWarning, enableThread, shouldThreadDelete } },
+			{ $set: { watchType, textLimit, customWarning, enableThread } },
 			{ upsert: true }
 		);
 
@@ -156,13 +157,13 @@ module.exports = {
 		}
 
 		// If delete moved messages is enabled, check for the manage messages permission
-		if (shouldThreadDelete) {
-			const botPermissions = interaction.channel.permissionsFor(interaction.guild.members.me);
-			const permissionName = new PermissionsBitField(PermissionFlagsBits.ManageMessages).toArray()[0];
-			if (!botPermissions.has(PermissionFlagsBits.ManageMessages)) {
-				permissionErrors.push(permissionName);
-			}
-		}
+		// if (shouldThreadDelete) { // Temporarily removing this option from the modal
+		// 	const botPermissions = interaction.channel.permissionsFor(interaction.guild.members.me);
+		// 	const permissionName = new PermissionsBitField(PermissionFlagsBits.ManageMessages).toArray()[0];
+		// 	if (!botPermissions.has(PermissionFlagsBits.ManageMessages)) {
+		// 		permissionErrors.push(permissionName);
+		// 	}
+		// }
 
 		// Finalize message with all of the config details
 		const embed = new EmbedBuilder()
@@ -177,7 +178,7 @@ module.exports = {
 				{ name: 'Watch Type', value: watchType, inline: true },
 				{ name: 'Message Limit', value: textLimit.toString(), inline: true },
 				{ name: 'Thread Creation', value: enableThread ? 'Enabled' : 'Disabled', inline: true },
-				{ name: 'Delete Moved Messages', value: shouldThreadDelete ? 'Yes' : 'No', inline: true },
+				// { name: 'Delete Moved Messages', value: shouldThreadDelete ? 'Yes' : 'No', inline: true }, // Temporarily removing this option from the modal
 				{ name: 'Warning Message', value: customWarning.length > 1024 ? customWarning.slice(0, 1021) + '...' : customWarning }
 			)
 			.setTimestamp();
